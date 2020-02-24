@@ -32,18 +32,18 @@ class TensorFlowSwiftAPIs(product.Product):
         return self.args.build_tensorflow_swift_apis
 
     def build(self, host_target):
-        toolchain_path = targets.toolchain_path(self.args.install_destdir,
-                                                self.args.install_prefix)
-        swiftc = os.path.join(toolchain_path, 'usr', 'bin', 'swiftc')
+        toolchain_path = targets.toolchain_path(
+            self.args.install_destdir, self.args.install_prefix
+        )
+        swiftc = os.path.join(toolchain_path, "usr", "bin", "swiftc")
 
-        tensorflow_source_dir = os.path.join(self.source_dir, '..',
-                                             'tensorflow')
+        tensorflow_source_dir = os.path.join(self.source_dir, "..", "tensorflow")
         tensorflow_source_dir = os.path.realpath(tensorflow_source_dir)
 
-        if host_target.startswith('macosx'):
-            lib_name = 'libtensorflow.dylib'
-        elif host_target.startswith('linux'):
-            lib_name = 'libtensorflow.so'
+        if host_target.startswith("macosx"):
+            lib_name = "libtensorflow.dylib"
+        elif host_target.startswith("linux"):
+            lib_name = "libtensorflow.so"
         else:
             raise RuntimeError("Unknown host target %s" % host_target)
 
@@ -62,31 +62,48 @@ class TensorFlowSwiftAPIs(product.Product):
 
         with shell.pushd(self.build_dir):
 
-            shell.call([
-                self.toolchain.cmake,
-                '-G', 'Ninja',
-                '-D', 'BUILD_SHARED_LIBS=YES',
-                '-D', 'CMAKE_INSTALL_PREFIX={}/usr'.format(
-                    self.args.install_destdir),
-                '-D', 'CMAKE_MAKE_PROGRAM={}'.format(self.toolchain.ninja),
-                '-D', 'CMAKE_Swift_COMPILER={}'.format(swiftc),
-                # SWIFT_ENABLE_TENSORFLOW
-                '-D', 'USE_BUNDLED_CTENSORFLOW=YES',
-                # SWIFT_ENABLE_TENSORFLOW END
-                '-D', 'TensorFlow_INCLUDE_DIR={}'.format(tensorflow_source_dir),
-                '-D', 'TensorFlow_LIBRARY={}'.format(
-                    os.path.join(tensorflow_source_dir, 'bazel-bin', 'tensorflow',
-                                 lib_name)),
-                '-D', 'CMAKE_Swift_FLAGS={}'.format('-L{}'.format(
-                    os.path.join(tensorflow_source_dir, 'bazel-bin', 'tensorflow'))
-                ),
-                '-B', self.build_dir,
-                '-S', self.source_dir,
-            ])
-            shell.call([
-                self.toolchain.cmake,
-                '--build', self.build_dir,
-            ])
+            shell.call(
+                [
+                    self.toolchain.cmake,
+                    "-G",
+                    "Ninja",
+                    "-D",
+                    "BUILD_SHARED_LIBS=YES",
+                    "-D",
+                    "CMAKE_INSTALL_PREFIX={}/usr".format(self.args.install_destdir),
+                    "-D",
+                    "CMAKE_MAKE_PROGRAM={}".format(self.toolchain.ninja),
+                    "-D",
+                    "CMAKE_Swift_COMPILER={}".format(swiftc),
+                    # SWIFT_ENABLE_TENSORFLOW
+                    "-D",
+                    "USE_BUNDLED_CTENSORFLOW=YES",
+                    # SWIFT_ENABLE_TENSORFLOW END
+                    "-D",
+                    "TensorFlow_INCLUDE_DIR={}".format(tensorflow_source_dir),
+                    "-D",
+                    "TensorFlow_LIBRARY={}".format(
+                        os.path.join(
+                            tensorflow_source_dir, "bazel-bin", "tensorflow", lib_name
+                        )
+                    ),
+                    "-D",
+                    "CMAKE_Swift_FLAGS={}".format(
+                        "-L{}".format(
+                            os.path.join(
+                                tensorflow_source_dir, "bazel-bin", "tensorflow"
+                            )
+                        )
+                    ),
+                    "-B",
+                    self.build_dir,
+                    "-S",
+                    self.source_dir,
+                ]
+            )
+            shell.call(
+                [self.toolchain.cmake, "--build", self.build_dir,]
+            )
 
     def should_test(self, host_target):
         return False
@@ -98,11 +115,9 @@ class TensorFlowSwiftAPIs(product.Product):
         return self.args.build_tensorflow_swift_apis
 
     def install(self, host_target):
-        shell.call([
-            self.toolchain.cmake,
-            '--build', self.build_dir,
-            '--target', 'install',
-        ])
+        shell.call(
+            [self.toolchain.cmake, "--build", self.build_dir, "--target", "install",]
+        )
 
 
 # SWIFT_ENABLE_TENSORFLOW
@@ -122,49 +137,59 @@ class TensorFlow(product.Product):
         return self.args.build_tensorflow_swift_apis
 
     def _get_tensorflow_library(self, host):
-        if host.startswith('macosx'):
-            return ('libtensorflow.2.1.0.dylib', 'libtensorflow.dylib')
+        if host.startswith("macosx"):
+            return ("libtensorflow.2.1.0.dylib", "libtensorflow.dylib")
 
-        if host.startswith('linux'):
-            return ('libtensorflow.so.2.1.0', 'libtensorflow.so')
+        if host.startswith("linux"):
+            return ("libtensorflow.so.2.1.0", "libtensorflow.so")
 
-        raise RuntimeError('unknown host target {}'.format(host))
+        raise RuntimeError("unknown host target {}".format(host))
 
     def build(self, host_target):
         with shell.pushd(self.source_dir):
             # Run the TensorFlow configure script: `yes "" | ./configure`.
             # NOTE: consider rewriting `subprocess` API usages using `shell`
             # APIs.
-            yes_process = subprocess.Popen(['yes', ''], stdout=subprocess.PIPE)
-            subprocess.check_call(['./configure'], stdin=yes_process.stdout)
+            yes_process = subprocess.Popen(["yes", ""], stdout=subprocess.PIPE)
+            subprocess.check_call(["./configure"], stdin=yes_process.stdout)
             yes_process.terminate()
 
             # Build TensorFlow via bazel.
-            shell.call([
-                self.toolchain.bazel,
-                "build",
-                "-c", "opt",
-                "--define", "framework_shared_object=false",
-                "//tensorflow:tensorflow",
-            ])
+            shell.call(
+                [
+                    self.toolchain.bazel,
+                    "build",
+                    "-c",
+                    "opt",
+                    "--define",
+                    "framework_shared_object=false",
+                    "//tensorflow:tensorflow",
+                ]
+            )
 
         # bazel builds libraries with version suffixes, e.g.
         # "libtensorflow.{dylib,so}.x.y.z".
         # Create a symlink to the standard unsuffixed library name:
         # "libtensorflow.{dylib,so}".
-        (suffixed_lib_name, unsuffixed_lib_name) = \
-            self._get_tensorflow_library(host_target)
+        (suffixed_lib_name, unsuffixed_lib_name) = self._get_tensorflow_library(
+            host_target
+        )
 
         # NOTE: ignore the race condition here ....
         try:
-            os.unlink(os.path.join(self.source_dir, 'bazel-bin', 'tensorflow',
-                                   unsuffixed_lib_name))
+            os.unlink(
+                os.path.join(
+                    self.source_dir, "bazel-bin", "tensorflow", unsuffixed_lib_name
+                )
+            )
         except OSError:
             pass
-        os.symlink(os.path.join(self.source_dir, 'bazel-bin', 'tensorflow',
-                                suffixed_lib_name),
-                   os.path.join(self.source_dir, 'bazel-bin', 'tensorflow',
-                                unsuffixed_lib_name))
+        os.symlink(
+            os.path.join(self.source_dir, "bazel-bin", "tensorflow", suffixed_lib_name),
+            os.path.join(
+                self.source_dir, "bazel-bin", "tensorflow", unsuffixed_lib_name
+            ),
+        )
 
     def should_test(self, host_target):
         return False
@@ -177,75 +202,125 @@ class TensorFlow(product.Product):
 
     def install(self, host_target):
         # Install `libtensorflow.{dylib,so}` in the toolchain.
-        (suffixed_lib_name, unsuffixed_lib_name) = \
-            self._get_tensorflow_library(host_target)
+        (suffixed_lib_name, unsuffixed_lib_name) = self._get_tensorflow_library(
+            host_target
+        )
 
         subdir = None
-        if host_target.startswith('macsox'):
-            subdir = 'macosx'
-        if host_target.startswith('linux'):
-            subdir = 'linux'
+        if host_target.startswith("macsox"):
+            subdir = "macosx"
+        if host_target.startswith("linux"):
+            subdir = "linux"
         if not subdir:
-            raise RuntimeError('unknown host target {}'.format(host_target))
+            raise RuntimeError("unknown host target {}".format(host_target))
 
         try:
-            os.unlink(os.path.join(self.install_toolchain_path(),
-                                   'usr', 'lib', 'swift',
-                                   subdir, suffixed_lib_name))
-            os.makedirs(os.path.join(self.install_toolchain_path(),
-                                     'usr', 'lib', 'swift', subdir))
+            os.unlink(
+                os.path.join(
+                    self.install_toolchain_path(),
+                    "usr",
+                    "lib",
+                    "swift",
+                    subdir,
+                    suffixed_lib_name,
+                )
+            )
+            os.makedirs(
+                os.path.join(
+                    self.install_toolchain_path(), "usr", "lib", "swift", subdir
+                )
+            )
         except OSError:
             pass
-        shutil.copy(os.path.join(self.source_dir, 'bazel-bin', 'tensorflow',
-                                 suffixed_lib_name),
-                    os.path.join(self.install_toolchain_path(),
-                                 'usr', 'lib', 'swift',
-                                 subdir, suffixed_lib_name))
+        shutil.copy(
+            os.path.join(self.source_dir, "bazel-bin", "tensorflow", suffixed_lib_name),
+            os.path.join(
+                self.install_toolchain_path(),
+                "usr",
+                "lib",
+                "swift",
+                subdir,
+                suffixed_lib_name,
+            ),
+        )
 
         # Add write permissions to `libtensorflow.{dylib,so}`.
         # This is required for symbol stripping and code signing.
-        os.chmod(os.path.join(self.install_toolchain_path(),
-                              'usr', 'lib', 'swift', subdir, suffixed_lib_name),
-                 0o755)
+        os.chmod(
+            os.path.join(
+                self.install_toolchain_path(),
+                "usr",
+                "lib",
+                "swift",
+                subdir,
+                suffixed_lib_name,
+            ),
+            0o755,
+        )
 
         try:
-            os.unlink(os.path.join(self.install_toolchain_path(),
-                                   'usr', 'lib', 'swift',
-                                   subdir, unsuffixed_lib_name))
+            os.unlink(
+                os.path.join(
+                    self.install_toolchain_path(),
+                    "usr",
+                    "lib",
+                    "swift",
+                    subdir,
+                    unsuffixed_lib_name,
+                )
+            )
         except OSError:
             pass
-        os.symlink(suffixed_lib_name,
-                   os.path.join(self.install_toolchain_path(),
-                                'usr', 'lib', 'swift',
-                                subdir, unsuffixed_lib_name))
+        os.symlink(
+            suffixed_lib_name,
+            os.path.join(
+                self.install_toolchain_path(),
+                "usr",
+                "lib",
+                "swift",
+                subdir,
+                unsuffixed_lib_name,
+            ),
+        )
 
         # Copy TensorFlow headers and `module.modulemap` to the toolchain.
         toolchain_tensorflow_library_path = os.path.join(
-            self.install_toolchain_path(), 'usr', 'lib', 'swift', 'tensorflow')
+            self.install_toolchain_path(), "usr", "lib", "swift", "tensorflow"
+        )
         try:
             shutil.rmtree(toolchain_tensorflow_library_path, ignore_errors=True)
-            os.makedirs(os.path.join(toolchain_tensorflow_library_path, 'c', 'eager'))
+            os.makedirs(os.path.join(toolchain_tensorflow_library_path, "c", "eager"))
         except OSError:
             pass
         for header in (
-                'c_api.h',
-                'c_api_experimental.h',
-                'tf_attrtype.h',
-                'tf_datatype.h',
-                'tf_status.h',
-                'tf_tensor.h',
-                'eager/c_api.h',
+            "c_api.h",
+            "c_api_experimental.h",
+            "tf_attrtype.h",
+            "tf_datatype.h",
+            "tf_status.h",
+            "tf_tensor.h",
+            "eager/c_api.h",
         ):
-            shutil.copy(os.path.join(self.source_dir, 'tensorflow', 'c', header),
-                        os.path.join(toolchain_tensorflow_library_path, 'c', header))
+            shutil.copy(
+                os.path.join(self.source_dir, "tensorflow", "c", header),
+                os.path.join(toolchain_tensorflow_library_path, "c", header),
+            )
 
         for name in (
-                'CTensorFlow.h',
-                'module.modulemap',
+            "CTensorFlow.h",
+            "module.modulemap",
         ):
-            shutil.copy(os.path.join(self.source_dir, '..',
-                                     'tensorflow-swift-apis', 'Sources',
-                                     'CTensorFlow', name),
-                        os.path.join(toolchain_tensorflow_library_path, name))
+            shutil.copy(
+                os.path.join(
+                    self.source_dir,
+                    "..",
+                    "tensorflow-swift-apis",
+                    "Sources",
+                    "CTensorFlow",
+                    name,
+                ),
+                os.path.join(toolchain_tensorflow_library_path, name),
+            )
+
 
 # SWIFT_ENABLE_TENSORFLOW END
